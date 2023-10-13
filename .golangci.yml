@@ -28,7 +28,6 @@ linters:
     - funlen
     - ginkgolinter
     - gocheckcompilerdirectives
-    - gochecknoglobals
     - gochecknoinits
     - gocognit
     - goconst
@@ -69,7 +68,6 @@ linters:
     - noctx
     - nolintlint
     - nonamedreturns
-    - nosprintfhostport
     - paralleltest
     - prealloc
     - predeclared
@@ -91,7 +89,6 @@ linters:
     - unparam
     - unused
     - usestdlibvars
-    - varnamelen
     - wastedassign
     - whitespace
     - wsl
