@@ -1,10 +1,14 @@
 package config
 
 import (
+	"log"
+	"sync"
+
 	"github.com/ilyakaznacheev/cleanenv"
 	_ "github.com/joho/godotenv/autoload"
 )
 
+// Config represents configuration settings for application.
 type Config struct {
 	TelegramToken string `env:"TELEGRAM_TOKEN"`
 
@@ -15,8 +19,22 @@ type Config struct {
 	PostgresDBName   string `env:"POSTGRES_DB_NAME"`
 }
 
-func New() (*Config, error) {
-	cfg := &Config{}
+var (
+	cfg  *Config
+	once sync.Once
+)
 
-	return cfg, cleanenv.ReadEnv(cfg)
+// Get returns a singleton instance of the Config struct.
+func Get() *Config {
+	// Using the sync.Once package to ensure that the instance is created only once.
+	once.Do(func() {
+		log.Printf("creating a new config instance now")
+		cfg = &Config{}
+
+		if err := cleanenv.ReadEnv(cfg); err != nil {
+			log.Fatalf("error reading environment variables: %v", err)
+		}
+	})
+
+	return cfg
 }
