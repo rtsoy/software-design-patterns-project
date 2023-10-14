@@ -1,17 +1,11 @@
 package postgres
 
 import (
-	"fmt"
-
-	"github.com/rtsoy/software-design-patterns-project/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func New(cfg *config.Config, models []interface{}) (*gorm.DB, error) {
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
-		cfg.PostgresUser, cfg.PostgresUser, cfg.PostgresHost, cfg.PostgresPort, cfg.PostgresDBName)
-
+func New(dsn string, models []interface{}) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dsn))
 	if err != nil {
 		return nil, err
