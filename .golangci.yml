@@ -1,5 +1,7 @@
 run:
   timeout: 3m
+  skip-dirs:
+    - scripts
 
 linters:
   disable-all: true
