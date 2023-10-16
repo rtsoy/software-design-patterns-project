@@ -15,6 +15,7 @@ type FuelPump struct {
 	FuelType     FuelType
 	Price        uint
 	IsAvailable  bool `gorm:"default:true"`
+	TelegramID   uint
 	GasStationID uint
 	GasStation   GasStation `gorm:"foreignKey:GasStationID"`
 }
