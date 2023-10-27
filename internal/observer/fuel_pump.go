@@ -12,11 +12,11 @@ import (
 type FuelPump struct {
 	repo   repository.ObserverRepository
 	bot    *tgbotapi.BotAPI
-	pumpID uint
+	pumpID uint64
 }
 
 // NewFuelPump creates a new FuelPump observer.
-func NewFuelPump(repo repository.ObserverRepository, bot *tgbotapi.BotAPI, pumpID uint) *FuelPump {
+func NewFuelPump(repo repository.ObserverRepository, bot *tgbotapi.BotAPI, pumpID uint64) *FuelPump {
 	return &FuelPump{
 		repo:   repo,
 		bot:    bot,
@@ -25,17 +25,17 @@ func NewFuelPump(repo repository.ObserverRepository, bot *tgbotapi.BotAPI, pumpI
 }
 
 // Subscribe allows a user to subscribe to notifications for the fuel pump.
-func (f *FuelPump) Subscribe(telegramID uint) error {
+func (f *FuelPump) Subscribe(telegramID int64) error {
 	return f.repo.Add(telegramID, f.pumpID)
 }
 
 // Unsubscribe allows a user to unsubscribe from notifications for the fuel pump.
-func (f *FuelPump) Unsubscribe(telegramID uint) error {
+func (f *FuelPump) Unsubscribe(telegramID int64) error {
 	return f.repo.Delete(telegramID, f.pumpID)
 }
 
 // NotifyAll sends notifications to all subscribed users when the pump becomes available.
-func (f *FuelPump) NotifyAll() ([]uint, error) {
+func (f *FuelPump) NotifyAll() ([]int64, error) {
 	// Retrieve the list of subscribed users.
 	ids, err := f.repo.GetAll(f.pumpID)
 	if err != nil {
@@ -46,7 +46,7 @@ func (f *FuelPump) NotifyAll() ([]uint, error) {
 	for _, id := range ids {
 		text := fmt.Sprintf("❗️ Колонка #%d освободилась! Скорее займите её!", f.pumpID)
 
-		msg := tgbotapi.NewMessage(int64(id), text)
+		msg := tgbotapi.NewMessage(id, text)
 
 		_, err = f.bot.Send(msg)
 		if err != nil {

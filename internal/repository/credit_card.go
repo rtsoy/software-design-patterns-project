@@ -15,7 +15,7 @@ func NewCreditCardRepository(db *gorm.DB) *CreditCardRepositoryPostgres {
 	}
 }
 
-func (r *CreditCardRepositoryPostgres) GetAll(telegramID uint) ([]model.CreditCard, error) {
+func (r *CreditCardRepositoryPostgres) GetAll(telegramID int64) ([]model.CreditCard, error) {
 	var result []model.CreditCard
 
 	err := r.db.Where("telegram_id = ?", telegramID).Find(&result).Error

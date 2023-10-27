@@ -1,7 +1,7 @@
 package observer
 
 type Subject interface {
-	Subscribe(id uint) error
-	Unsubscribe(id uint) error
-	NotifyAll() ([]uint, error)
+	Subscribe(id int64) error
+	Unsubscribe(id int64) error
+	NotifyAll() ([]int64, error)
 }

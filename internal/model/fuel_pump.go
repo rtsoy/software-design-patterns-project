@@ -11,11 +11,11 @@ const (
 )
 
 type FuelPump struct {
-	ID           uint `gorm:"primaryKey"`
+	ID           uint64 `gorm:"primaryKey"`
 	FuelType     FuelType
-	Price        uint
+	Price        uint64
 	IsAvailable  bool `gorm:"default:true"`
-	TelegramID   uint
-	GasStationID uint
+	TelegramID   int64
+	GasStationID uint64
 	GasStation   GasStation `gorm:"foreignKey:GasStationID"`
 }

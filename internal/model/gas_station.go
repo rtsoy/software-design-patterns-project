@@ -1,7 +1,7 @@
 package model
 
 type GasStation struct {
-	ID      uint `gorm:"primaryKey"`
+	ID      uint64 `gorm:"primaryKey"`
 	Company string
 	Address string
 }

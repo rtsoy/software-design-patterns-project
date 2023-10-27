@@ -15,8 +15,8 @@ func NewObserverRepositoryPostgres(db *gorm.DB) *ObserverRepositoryPostgres {
 	}
 }
 
-func (r *ObserverRepositoryPostgres) GetAll(pumpID uint) ([]uint, error) {
-	var result []uint
+func (r *ObserverRepositoryPostgres) GetAll(pumpID uint64) ([]int64, error) {
+	var result []int64
 
 	err := r.db.Model(model.Observer{}).Select("telegram_id").
 		Where("fuel_pump_id = ?", pumpID).Find(&result).Error
@@ -24,7 +24,7 @@ func (r *ObserverRepositoryPostgres) GetAll(pumpID uint) ([]uint, error) {
 	return result, err
 }
 
-func (r *ObserverRepositoryPostgres) Add(telegramID, pumpID uint) error {
+func (r *ObserverRepositoryPostgres) Add(telegramID int64, pumpID uint64) error {
 	err := r.db.Create(&model.Observer{
 		TelegramID: telegramID,
 		FuelPumpID: pumpID,
@@ -33,7 +33,7 @@ func (r *ObserverRepositoryPostgres) Add(telegramID, pumpID uint) error {
 	return err
 }
 
-func (r *ObserverRepositoryPostgres) Delete(telegramID, pumpID uint) error {
+func (r *ObserverRepositoryPostgres) Delete(telegramID int64, pumpID uint64) error {
 	err := r.db.Where("telegram_id = ? AND fuel_pump_id = ?",
 		telegramID, pumpID).Delete(&model.Observer{}).Error
 

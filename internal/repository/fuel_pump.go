@@ -19,8 +19,8 @@ func NewFuelPumpRepositoryPostgres(db *gorm.DB) *FuelPumpRepositoryPostgres {
 	}
 }
 
-func (r *FuelPumpRepositoryPostgres) ReleaseAll(telegramID uint) ([]uint, error) {
-	var result []uint
+func (r *FuelPumpRepositoryPostgres) ReleaseAll(telegramID int64) ([]uint64, error) {
+	var result []uint64
 
 	err := r.db.Model(&model.FuelPump{}).Select("id").
 		Where("telegram_id = ?", telegramID).Find(&result).Error
@@ -38,7 +38,7 @@ func (r *FuelPumpRepositoryPostgres) ReleaseAll(telegramID uint) ([]uint, error)
 	return result, nil
 }
 
-func (r *FuelPumpRepositoryPostgres) TakeOrRelease(telegramID, pumpID uint) error {
+func (r *FuelPumpRepositoryPostgres) TakeOrRelease(telegramID int64, pumpID uint64) error {
 	var pump model.FuelPump
 
 	err := r.db.First(&pump, pumpID).Error
@@ -65,7 +65,7 @@ func (r *FuelPumpRepositoryPostgres) TakeOrRelease(telegramID, pumpID uint) erro
 	return err
 }
 
-func (r *FuelPumpRepositoryPostgres) GetAll(stationID uint) ([]model.FuelPump, error) {
+func (r *FuelPumpRepositoryPostgres) GetAll(stationID uint64) ([]model.FuelPump, error) {
 	var result []model.FuelPump
 
 	err := r.db.Where("gas_station_id = ?", stationID).Find(&result).Error

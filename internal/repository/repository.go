@@ -6,15 +6,15 @@ import (
 )
 
 type ObserverRepository interface {
-	GetAll(pumpID uint) ([]uint, error)
-	Add(telegramID, pumpID uint) error
-	Delete(telegramID, pumpID uint) error
+	GetAll(pumpID uint64) ([]int64, error)
+	Add(telegramID int64, pumpID uint64) error
+	Delete(telegramID int64, pumpID uint64) error
 }
 
 type FuelPumpRepository interface {
-	GetAll(stationID uint) ([]model.FuelPump, error)
-	TakeOrRelease(telegramID, pumpID uint) error
-	ReleaseAll(telegramID uint) ([]uint, error)
+	GetAll(stationID uint64) ([]model.FuelPump, error)
+	TakeOrRelease(telegramID int64, pumpID uint64) error
+	ReleaseAll(telegramID int64) ([]uint64, error)
 }
 
 type GasStationRepository interface {
@@ -22,7 +22,7 @@ type GasStationRepository interface {
 }
 
 type CreditCardRepository interface {
-	GetAll(telegramID uint) ([]model.CreditCard, error)
+	GetAll(telegramID int64) ([]model.CreditCard, error)
 	Create(card model.CreditCard) error
 }
 
