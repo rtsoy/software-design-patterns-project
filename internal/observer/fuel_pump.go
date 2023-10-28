@@ -3,20 +3,20 @@ package observer
 import (
 	"fmt"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rtsoy/software-design-patterns-project/internal/repository"
+	tele "gopkg.in/telebot.v3"
 )
 
 // FuelPump represents a fuel pump observer that allows users to subscribe, unsubscribe,
 // and receive notifications when the pump becomes available.
 type FuelPump struct {
 	repo   repository.ObserverRepository
-	bot    *tgbotapi.BotAPI
+	bot    *tele.Bot
 	pumpID uint64
 }
 
 // NewFuelPump creates a new FuelPump observer.
-func NewFuelPump(repo repository.ObserverRepository, bot *tgbotapi.BotAPI, pumpID uint64) *FuelPump {
+func NewFuelPump(repo repository.ObserverRepository, bot *tele.Bot, pumpID uint64) *FuelPump {
 	return &FuelPump{
 		repo:   repo,
 		bot:    bot,
@@ -46,9 +46,7 @@ func (f *FuelPump) NotifyAll() ([]int64, error) {
 	for _, id := range ids {
 		text := fmt.Sprintf("❗️ Колонка #%d освободилась! Скорее займите её!", f.pumpID)
 
-		msg := tgbotapi.NewMessage(id, text)
-
-		_, err = f.bot.Send(msg)
+		_, err = f.bot.Send(&tele.User{ID: id}, text)
 		if err != nil {
 			return nil, err
 		}
