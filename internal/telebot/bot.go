@@ -12,8 +12,9 @@ const _defaultLongPollerTimeout = 10 * time.Second
 
 // Bot represents a Telegram bot instance and its associated functionality.
 type Bot struct {
-	bot  *tele.Bot
-	repo *repository.Repository
+	bot             *tele.Bot
+	repo            *repository.Repository
+	lastSentMessage *lastSentMessage
 }
 
 // New creates a new Bot instance with the provided repository and starts it.
@@ -30,8 +31,9 @@ func New(repo *repository.Repository) (*Bot, error) {
 	}
 
 	bot := &Bot{
-		bot:  b,
-		repo: repo,
+		bot:             b,
+		repo:            repo,
+		lastSentMessage: newLastSentMessage(),
 	}
 
 	// Initialize message handlers.

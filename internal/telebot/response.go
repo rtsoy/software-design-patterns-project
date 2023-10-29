@@ -14,6 +14,11 @@ var (
 	chooseFuelPumpMessage         = "🚘 Выбери необходимую колонку!"
 	fuelPumpIsNotAvailableMessage = "🚫 Колонка занята! Мы уведовим вас, когда она освободится!"
 	choosePaymentMethodMessage    = "💸 Пожалуйста выберите метод отплаты!"
+
+	enterCardNumberMessage  = "🔢 Введите номер карты, расположен на ее лицевой стороне и обычно состоит из 16 цифр."
+	enterCardExpDateMessage = "⌛️ Введите дату истечения карты, дата под номером банковской карты."
+	enterCardHolderMessage  = "🤵 Введите имя и фамилию держателя карты, расположено на лицевой стороне карты."
+	enterCardCVVMessage     = "🤫 Введите трёхзначный код расположенный на задней части карты."
 )
 
 // getPaymentMarkup returns a markup for selecting payment methods.
@@ -39,7 +44,7 @@ func (b *Bot) getFuelPumpsMarkup(stationID uint64) (*tele.ReplyMarkup, error) {
 	}
 
 	markup := &tele.ReplyMarkup{}
-	rows := make([]tele.Row, len(pumps))
+	rows := make([]tele.Row, len(pumps)+1)
 
 	for idx, pump := range pumps {
 		availability := "✅"
@@ -50,6 +55,8 @@ func (b *Bot) getFuelPumpsMarkup(stationID uint64) (*tele.ReplyMarkup, error) {
 		text := fmt.Sprintf("%d | 🛢 %s - %d₸ %s", pump.ID, pump.FuelType, pump.Price, availability)
 		rows[idx] = markup.Row(markup.Text(text))
 	}
+
+	rows[len(pumps)] = markup.Row(markup.Text("⛔️ Отмена!"))
 
 	markup.Reply(rows...)
 
@@ -64,12 +71,14 @@ func (b *Bot) getStationsMarkup() (*tele.ReplyMarkup, error) {
 	}
 
 	markup := &tele.ReplyMarkup{}
-	rows := make([]tele.Row, len(stations))
+	rows := make([]tele.Row, len(stations)+1)
 
 	for idx, station := range stations {
 		text := fmt.Sprintf("%d | ⛽️ %s (%s)", station.ID, station.Company, station.Address)
 		rows[idx] = markup.Row(markup.Text(text))
 	}
+
+	rows[len(stations)] = markup.Row(markup.Text("💼 Привязать карту."))
 
 	markup.Reply(rows...)
 

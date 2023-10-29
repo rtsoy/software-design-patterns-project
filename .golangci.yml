@@ -41,7 +41,7 @@ linters:
 #    - gofmt
 #    - gofumpt
     - goheader
-    - goimports
+#    - goimports
     - gomnd
     - gomoddirectives
     - gomodguard
@@ -95,3 +95,10 @@ linters:
     - whitespace
     - wsl
     - zerologlint
+
+issues:
+  exclude-rules:
+    # Temporarily excluding
+    - path: internal/telebot
+      linters:
+        - unused

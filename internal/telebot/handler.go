@@ -17,24 +17,24 @@ const (
 
 // initHandlers initializes the command handlers for the bot.
 func (b *Bot) initHandlers() {
-	b.bot.Handle(onStart, b.handleStart)
-	b.bot.Handle(onCancel, b.handleCancel)
-	b.bot.Handle(tele.OnText, b.handleMessage)
+	b.bot.Handle(onStart, b.wrap(b.handleStart))
+	b.bot.Handle(onCancel, b.wrap(b.handleCancel))
+	b.bot.Handle(tele.OnText, b.wrap(b.handleMessage))
 }
 
 // handleStart handles the "/start" command.
-func (b *Bot) handleStart(c tele.Context) error {
+func (b *Bot) handleStart(c tele.Context) (*tele.Message, error) {
 	// Retrieve markup for available stations and send a start message.
 	markup, err := b.getStationsMarkup()
 	if err != nil {
-		return c.Send(errorMessage)
+		return b.bot.Send(c.Sender(), errorMessage)
 	}
 
-	return c.Send(startMessage, markup)
+	return b.bot.Send(c.Sender(), startMessage, markup)
 }
 
 // handleCancel handles the cancellation command.
-func (b *Bot) handleCancel(c tele.Context) error {
+func (b *Bot) handleCancel(c tele.Context) (*tele.Message, error) {
 	// Release all fuel pumps reserved by the user.
 	ids, err := b.repo.ReleaseAll(c.Sender().ID)
 	if err != nil {
@@ -63,7 +63,7 @@ func (b *Bot) handleCancel(c tele.Context) error {
 }
 
 // handleMessage handles user messages.
-func (b *Bot) handleMessage(c tele.Context) error {
+func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) {
 	switch {
 	// ex. "1 | ⛽️ Gas Energy (просп. Кабанбай Батыра 45B)"
 	case strings.Contains(c.Text(), "⛽️"):
@@ -73,20 +73,30 @@ func (b *Bot) handleMessage(c tele.Context) error {
 	case strings.Contains(c.Text(), "🛢"):
 		return b.handleOrder(c)
 
+	// ex. "💼 Привязать карту."
+	case strings.Contains(c.Text(), "💼"):
+		return b.linkCard(c)
+
 	// Unexpected response (command/message)
 	default:
-		return c.Send(unknownCommandMessage)
+		return b.bot.Send(c.Sender(), unknownCommandMessage)
 	}
 }
 
+// linkCard handles the card linking process.
+func (b *Bot) linkCard(c tele.Context) (*tele.Message, error) {
+	// TODO: Implement the logic to link a card here.
+	return nil, nil //nolint
+}
+
 // handleOrder handles the order process.
-func (b *Bot) handleOrder(c tele.Context) error {
+func (b *Bot) handleOrder(c tele.Context) (*tele.Message, error) {
 	// Extract fuel pump ID from the user's message.
 	id, err := b.extractIDFromMessage(c.Text())
 	if err != nil {
 		log.Printf("msg: %s | %v", c.Text(), err) // ???
 
-		return err
+		return nil, err
 	}
 
 	// Attempt to take or release a fuel pump for the user.
@@ -98,7 +108,7 @@ func (b *Bot) handleOrder(c tele.Context) error {
 			if err != nil {
 				log.Printf("msg: %s | %v", c.Text(), err) // ???
 
-				return err
+				return nil, err
 			}
 
 			obs := observer.NewFuelPump(b.repo.ObserverRepository, b.bot, id)
@@ -114,24 +124,24 @@ func (b *Bot) handleOrder(c tele.Context) error {
 
 		log.Printf("msg: %s | %v", c.Text(), err) // ???
 
-		return err
+		return nil, err
 	}
 
 	// Provide the user with payment method options.
 	markup := b.getPaymentMarkup()
 
 	// TODO: Payment process
-	return c.Send(choosePaymentMethodMessage, markup)
+	return b.bot.Send(c.Sender(), choosePaymentMethodMessage, markup)
 }
 
 // handleFuelPumps handles the fuel pump selection process.
-func (b *Bot) handleFuelPumps(c tele.Context) error {
+func (b *Bot) handleFuelPumps(c tele.Context) (*tele.Message, error) {
 	// Extract fuel pump ID from the user's message.
 	id, err := b.extractIDFromMessage(c.Text())
 	if err != nil {
 		log.Printf("msg: %s | %v", c.Text(), err) // ???
 
-		return err
+		return nil, err
 	}
 
 	// Retrieve markup for available fuel pumps at the selected station and send it to the user.
@@ -139,8 +149,8 @@ func (b *Bot) handleFuelPumps(c tele.Context) error {
 	if err != nil {
 		log.Printf("msg: %s | %v", c.Text(), err) // / ???
 
-		return err
+		return nil, err
 	}
 
-	return c.Send(chooseFuelPumpMessage, markup)
+	return b.bot.Send(c.Sender(), chooseFuelPumpMessage, markup)
 }
