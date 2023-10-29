@@ -98,7 +98,6 @@ linters:
 
 issues:
   exclude-rules:
-    # Temporarily excluding
-    - path: internal/telebot
+    - path: internal/telebot/verification.go
       linters:
-        - unused
+        - gomnd
