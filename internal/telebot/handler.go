@@ -2,11 +2,15 @@ package telebot
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/rtsoy/software-design-patterns-project/internal/model"
 	"github.com/rtsoy/software-design-patterns-project/internal/observer"
+	"github.com/rtsoy/software-design-patterns-project/internal/payment"
 	"github.com/rtsoy/software-design-patterns-project/internal/repository"
 	tele "gopkg.in/telebot.v3"
 )
@@ -16,7 +20,15 @@ const (
 	onCancel = "⛔️ Отмена!"
 )
 
-var cards = map[int64]model.CreditCard{}
+type order struct {
+	price  uint64
+	amount uint64
+}
+
+var (
+	cards  = map[int64]model.CreditCard{}
+	orders = map[int64]order{}
+)
 
 // initHandlers initializes the command handlers for the bot.
 func (b *Bot) initHandlers() {
@@ -44,6 +56,8 @@ func (b *Bot) handleCancel(c tele.Context) (*tele.Message, error) {
 		log.Printf("failed to release all users' fuel pumps: %v", err)
 	}
 
+	delete(orders, c.Sender().ID)
+
 	// Notify subscribed users and unsubscribe them from fuel pump updates.
 	for _, id := range ids {
 		obs := observer.NewFuelPump(b.repo.ObserverRepository, b.bot, id)
@@ -66,7 +80,7 @@ func (b *Bot) handleCancel(c tele.Context) (*tele.Message, error) {
 }
 
 // handleMessage handles user messages.
-func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) {
+func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) { //nolint
 	switch {
 	// ex. "1 | ⛽️ Gas Energy (просп. Кабанбай Батыра 45B)"
 	case strings.Contains(c.Text(), "⛽️"):
@@ -96,10 +110,152 @@ func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) {
 	case b.lastSentMessage.get(c.Sender().ID) == enterCardCVVMessage:
 		return b.handleCVV(c)
 
+	// Check if the last sent message was for inserting fuel amount
+	case b.lastSentMessage.get(c.Sender().ID) == insertFuelAmountMessage:
+		return b.handleFuelAmount(c)
+
+	// ex. "💵 Наличный рассчет"
+	case strings.Contains(c.Text(), "💵"):
+		return b.handleCashPayment(c)
+
+	// ex. "☑️ Готово!"
+	case strings.Contains(c.Text(), "☑️"):
+		return b.handlePaymentToTheCashier(c)
+
+	// ex. "💳 Безналичный рассчет"
+	case strings.Contains(c.Text(), "💳"):
+		return b.handleCreditCardPayment(c)
+
+	// Check if the last sent message was for choosing credit card
+	case b.lastSentMessage.get(c.Sender().ID) == chooseCreditCard:
+		return b.handleBankPayment(c)
+
+	// ex. "▶️ Начать!"
+	case strings.Contains(c.Text(), "▶️"):
+		return b.handleRefueling(c)
+
+	// ex. "🛑 Закончить заправку!"
+	case strings.Contains(c.Text(), "🛑"):
+		return b.handleCancel(c)
+
 	// Unexpected response (command/message)
 	default:
 		return b.bot.Send(c.Sender(), unknownCommandMessage)
 	}
+}
+
+// handleRefueling handles the user's request to stop refueling.
+func (b *Bot) handleRefueling(c tele.Context) (*tele.Message, error) {
+	return b.bot.Send(c.Sender(), stopRefueling, b.getStopMarkup())
+}
+
+// handleBankPayment handles the user's request to make a payment using a bank card.
+func (b *Bot) handleBankPayment(c tele.Context) (*tele.Message, error) {
+	// Get the user's credit cards.
+	userCards, err := b.repo.CreditCardRepository.GetAll(c.Sender().ID)
+	if err != nil {
+		if _, err := b.bot.Send(c.Sender(), somethingWentWrongMessage); err != nil {
+			log.Printf("failed to send a message to the user: %v", err)
+		}
+
+		return b.handleCancel(c)
+	}
+
+	// Extract the card ID from the user's input.
+	re := regexp.MustCompile(`(\d+).`)
+	matches := re.FindAllStringSubmatch(c.Text(), -1)
+	cardID, _ := strconv.Atoi(matches[0][1])
+
+	// Get the selected card.
+	card := userCards[cardID-1]
+
+	// Create a payment strategy using the selected card.
+	payStrategy := payment.NewCreditCard(&card)
+
+	// Get the user's order and calculate the total amount to be paid.
+	userOrder := orders[c.Sender().ID]
+	total := userOrder.price * userOrder.amount
+
+	// Process the payment using the selected card.
+	payStrategy.ProcessPayment(total)
+
+	// Send a confirmation message to the user with the deducted amount.
+	if _, err := b.bot.Send(c.Sender(), fmt.Sprintf("-%d₸", total)); err != nil {
+		log.Printf("failed to send a message to the user: %v", err)
+	}
+
+	return b.bot.Send(c.Sender(), startRefueling, b.getStartMarkup())
+}
+
+// handleCreditCardPayment handles the user's request to pay using a credit card.
+func (b *Bot) handleCreditCardPayment(c tele.Context) (*tele.Message, error) {
+	// Get the user's credit cards.
+	userCards, err := b.repo.CreditCardRepository.GetAll(c.Sender().ID)
+	if err != nil {
+		if _, err := b.bot.Send(c.Sender(), somethingWentWrongMessage); err != nil {
+			log.Printf("failed to send a message to the user: %v", err)
+		}
+
+		return b.handleCancel(c)
+	}
+
+	// Check if the user has no attached credit cards and guide them to add one.
+	if len(userCards) == 0 {
+		if _, err := b.bot.Send(c.Sender(), noAttachedCreditCards); err != nil {
+			log.Printf("failed to send a message to the user: %v", err)
+		}
+
+		// Provide options for payment methods.
+		return b.bot.Send(c.Sender(), choosePaymentMethodMessage, b.getPaymentMarkup())
+	}
+
+	// Provide a list of the user's credit cards for selection.
+	return b.bot.Send(c.Sender(), chooseCreditCard, b.getCreditCardsMarkup(userCards))
+}
+
+// handlePaymentToTheCashier handles the user's request to make a payment to the cashier using cash.
+func (b *Bot) handlePaymentToTheCashier(c tele.Context) (*tele.Message, error) {
+	// Create a payment strategy for cash.
+	payStrategy := payment.NewCash()
+
+	// Get the user's order and calculate the total amount to be paid.
+	userOrder := orders[c.Sender().ID]
+	total := userOrder.price * userOrder.amount
+
+	// Process the payment using cash.
+	payStrategy.ProcessPayment(total)
+
+	// Send a confirmation message to the user and return to the refueling process.
+	return b.bot.Send(c.Sender(), startRefueling, b.getStartMarkup())
+}
+
+// handleCashPayment handles the user's request to pay with cash.
+func (b *Bot) handleCashPayment(c tele.Context) (*tele.Message, error) {
+	// Get the user's order and calculate the total amount to be paid.
+	userOrder := orders[c.Sender().ID]
+	total := userOrder.price * userOrder.amount
+
+	// Provide the total amount and options to complete or cancel the payment.
+	return c.Bot().Send(c.Sender(), b.getCashPaymentMessage(total), b.getDoneOrCancelMarkup())
+}
+
+// handleFuelAmount handle the user's input of the fuel amount.
+func (b *Bot) handleFuelAmount(c tele.Context) (*tele.Message, error) {
+	amount, err := strconv.ParseUint(c.Text(), 10, 64)
+	if err != nil {
+		if _, err := b.bot.Send(c.Sender(), somethingWentWrongMessage); err != nil {
+			log.Printf("failed to send a message to the user: %v", err)
+		}
+
+		return b.bot.Send(c.Sender(), insertFuelAmountMessage)
+	}
+
+	// Update the user's order with the selected fuel amount.
+	ord := orders[c.Sender().ID]
+	ord.amount = amount
+	orders[c.Sender().ID] = ord
+
+	return b.bot.Send(c.Sender(), choosePaymentMethodMessage, b.getPaymentMarkup())
 }
 
 // handleCVV handles the user's entry of the CVV (Card Verification Value).
@@ -243,11 +399,13 @@ func (b *Bot) handleOrder(c tele.Context) (*tele.Message, error) {
 		return nil, err
 	}
 
-	// Provide the user with payment method options.
-	markup := b.getPaymentMarkup()
+	re := regexp.MustCompile(`(\d+)₸`)
+	matches := re.FindAllStringSubmatch(c.Text(), -1)
+	pumpPrice, _ := strconv.ParseUint(matches[0][1], 10, 64)
 
-	// TODO: Payment process
-	return b.bot.Send(c.Sender(), choosePaymentMethodMessage, markup)
+	orders[c.Sender().ID] = order{price: pumpPrice}
+
+	return b.bot.Send(c.Sender(), insertFuelAmountMessage, b.getCancelMarkup())
 }
 
 // handleFuelPumps handles the fuel pump selection process.
