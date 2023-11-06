@@ -37,193 +37,124 @@ func main() {
 		return
 	}
 
-	// Gas Energy
+	var (
+		// Define station factories for creating GasStation objects.
+		stationFactory       GasStationFactory = &ConcreteGasStationFactory{db: db}
+		loggerStationFactory GasStationFactory = &LoggerGasStationFactory{factory: stationFactory}
 
-	gasEnergy := model.GasStation{
-		Company: "Gas Energy",
-		Address: "просп. Кабанбай Батыра 45B",
+		// Define pump factories for creating FuelPump objects.
+		pumpFactory       FuelPumpFactory = &ConcreteFuelPumpFactory{db: db}
+		loggerPumpFactory FuelPumpFactory = &LoggerFuelPumpFactory{factory: pumpFactory}
+	)
+
+	// Define data for creating GasStation and FuelPump objects.
+	data := []struct {
+		station model.GasStation
+		pumps   []model.FuelPump
+	}{
+		{
+			station: model.GasStation{Company: "Gas Energy", Address: "просп. Кабанбай Батыра 45B"},
+			pumps: []model.FuelPump{
+				{
+					FuelType:    model.Gas,
+					Price:       76,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.AI92,
+					Price:       205,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.AI95,
+					Price:       265,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.AI98,
+					Price:       310,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.Diesel,
+					Price:       295,
+					IsAvailable: true,
+				},
+			},
+		},
+		{
+			station: model.GasStation{Company: "Qazaq Oil", Address: "шоссе Каркаралы 1/1"},
+			pumps: []model.FuelPump{
+				{
+					FuelType:    model.AI92,
+					Price:       205,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.AI95,
+					Price:       260,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.Diesel,
+					Price:       295,
+					IsAvailable: true,
+				},
+			},
+		},
+		{
+			station: model.GasStation{Company: "Helios", Address: "ул. Енбекшилер 18/1"},
+			pumps: []model.FuelPump{
+				{
+					FuelType:    model.AI92,
+					Price:       205,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.AI95,
+					Price:       249,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.AI98,
+					Price:       248,
+					IsAvailable: true,
+				},
+			},
+		},
+		{
+			station: model.GasStation{Company: "Газпромнефть", Address: "просп. Богенбай батыра 24"},
+			pumps: []model.FuelPump{
+				{
+					FuelType:    model.AI92,
+					Price:       205,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.AI95,
+					Price:       255,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.AI98,
+					Price:       280,
+					IsAvailable: true,
+				},
+				{
+					FuelType:    model.Diesel,
+					Price:       295,
+					IsAvailable: true,
+				},
+			},
+		},
 	}
 
-	err = db.Create(&gasEnergy).Error
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("NEW RECORD: (GasStation) %+v\n", gasEnergy)
+	// Loop through the data and create GasStation and FuelPump objects.
+	for _, elem := range data {
+		station, _ := loggerStationFactory.CreateGasStation(elem.station.Address, elem.station.Company)
 
-	gasEnergyPumps := []model.FuelPump{
-		{
-			FuelType:     model.Gas,
-			Price:        76,
-			IsAvailable:  true,
-			GasStationID: gasEnergy.ID,
-		},
-		{
-			FuelType:     model.AI92,
-			Price:        205,
-			IsAvailable:  true,
-			GasStationID: gasEnergy.ID,
-		},
-		{
-			FuelType:     model.AI95,
-			Price:        265,
-			IsAvailable:  true,
-			GasStationID: gasEnergy.ID,
-		},
-		{
-			FuelType:     model.AI98,
-			Price:        310,
-			IsAvailable:  true,
-			GasStationID: gasEnergy.ID,
-		},
-		{
-			FuelType:     model.Diesel,
-			Price:        295,
-			IsAvailable:  true,
-			GasStationID: gasEnergy.ID,
-		},
-	}
-
-	for _, pump := range gasEnergyPumps {
-		err = db.Create(&pump).Error
-		if err != nil {
-			log.Fatal(err)
+		for _, pump := range elem.pumps {
+			loggerPumpFactory.CreateFuelPump(pump.FuelType, pump.Price, station.ID)
 		}
-
-		log.Printf("NEW RECORD: (FuelPump) %+v\n", pump)
-	}
-
-	// Qazaq Oil
-
-	qazaqOil := model.GasStation{
-		Company: "Qazaq Oil",
-		Address: "шоссе Каркаралы 1/1",
-	}
-
-	err = db.Create(&qazaqOil).Error
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("NEW RECORD: (GasStation) %+v\n", qazaqOil)
-
-	qazaqOilPumps := []model.FuelPump{
-		{
-			FuelType:     model.AI92,
-			Price:        205,
-			IsAvailable:  true,
-			GasStationID: qazaqOil.ID,
-		},
-		{
-			FuelType:     model.AI95,
-			Price:        260,
-			IsAvailable:  true,
-			GasStationID: qazaqOil.ID,
-		},
-		{
-			FuelType:     model.Diesel,
-			Price:        295,
-			IsAvailable:  true,
-			GasStationID: qazaqOil.ID,
-		},
-	}
-
-	for _, pump := range qazaqOilPumps {
-		err = db.Create(&pump).Error
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		log.Printf("NEW RECORD: (FuelPump) %+v\n", pump)
-	}
-
-	// Helios
-
-	helios := model.GasStation{
-		Company: "Helios",
-		Address: "ул. Енбекшилер 18/1",
-	}
-
-	err = db.Create(&helios).Error
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("NEW RECORD: (GasStation) %+v\n", helios)
-
-	heliosPumps := []model.FuelPump{
-		{
-			FuelType:     model.AI92,
-			Price:        205,
-			IsAvailable:  true,
-			GasStationID: helios.ID,
-		},
-		{
-			FuelType:     model.AI95,
-			Price:        249,
-			IsAvailable:  true,
-			GasStationID: helios.ID,
-		},
-		{
-			FuelType:     model.AI98,
-			Price:        248,
-			IsAvailable:  true,
-			GasStationID: helios.ID,
-		},
-	}
-
-	for _, pump := range heliosPumps {
-		err = db.Create(&pump).Error
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		log.Printf("NEW RECORD: (FuelPump) %+v\n", pump)
-	}
-
-	// Газпромнефть
-
-	gaspromneft := model.GasStation{
-		Company: "Газпромнефть",
-		Address: "просп. Богенбай батыра 24",
-	}
-
-	err = db.Create(&gaspromneft).Error
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("NEW RECORD: (GasStation) %+v\n", gaspromneft)
-
-	gaspromneftPumps := []model.FuelPump{
-		{
-			FuelType:     model.AI92,
-			Price:        205,
-			IsAvailable:  true,
-			GasStationID: gaspromneft.ID,
-		},
-		{
-			FuelType:     model.AI95,
-			Price:        255,
-			IsAvailable:  true,
-			GasStationID: gaspromneft.ID,
-		},
-		{
-			FuelType:     model.AI98,
-			Price:        280,
-			IsAvailable:  true,
-			GasStationID: gaspromneft.ID,
-		},
-		{
-			FuelType:     model.Diesel,
-			Price:        295,
-			IsAvailable:  true,
-			GasStationID: gaspromneft.ID,
-		},
-	}
-
-	for _, pump := range gaspromneftPumps {
-		err = db.Create(&pump).Error
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		log.Printf("NEW RECORD: (FuelPump) %+v\n", pump)
 	}
 }
