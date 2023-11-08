@@ -15,6 +15,8 @@ type Bot struct {
 	bot             *tele.Bot
 	repo            *repository.Repository
 	lastSentMessage *lastSentMessage
+
+	cardAttachmentHandler CardHandler
 }
 
 // New creates a new Bot instance with the provided repository and starts it.
@@ -35,6 +37,32 @@ func New(repo *repository.Repository) (*Bot, error) {
 		repo:            repo,
 		lastSentMessage: newLastSentMessage(),
 	}
+
+	cardCVVHandler := &CardCVVHandler{
+		next: nil,
+		b:    bot,
+	}
+
+	cardHolderHandler := &CardHolderHandler{
+		next: cardCVVHandler,
+		b:    bot,
+	}
+
+	cardExpDateHandler := &CardExpDateHandler{
+		next: cardHolderHandler,
+		b:    bot,
+	}
+
+	cardNumberHandler := &CardNumberHandler{
+		next: cardExpDateHandler,
+		b:    bot,
+	}
+
+	initCardHandler := &ConcreteNumberHandler{
+		next: cardNumberHandler,
+		b:    bot,
+	}
+	bot.cardAttachmentHandler = initCardHandler
 
 	// Initialize message handlers.
 	bot.initHandlers()

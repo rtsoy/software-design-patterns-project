@@ -101,3 +101,6 @@ issues:
     - path: internal/telebot/verification.go
       linters:
         - gomnd
+    - path: internal/telebot/card_attachment.go
+      linters:
+        - ireturn

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rtsoy/software-design-patterns-project/internal/model"
 	"github.com/rtsoy/software-design-patterns-project/internal/observer"
 	"github.com/rtsoy/software-design-patterns-project/internal/payment"
 	"github.com/rtsoy/software-design-patterns-project/internal/repository"
@@ -26,7 +25,6 @@ type order struct {
 }
 
 var (
-	cards  = map[int64]model.CreditCard{}
 	orders = map[int64]order{}
 )
 
@@ -92,23 +90,23 @@ func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) { //nolint
 
 	// ex. "💼 Привязать карту."
 	case strings.Contains(c.Text(), "💼"):
-		return b.handleCardLink(c)
+		return b.cardAttachmentHandler.Handle(c)
 
 	// Check if the last sent message was for entering card number
 	case b.lastSentMessage.get(c.Sender().ID) == enterCardNumberMessage:
-		return b.handleCardNumber(c)
+		return b.cardAttachmentHandler.GetNext().Handle(c)
 
 	// Check if the last sent message was for entering card expiration date
 	case b.lastSentMessage.get(c.Sender().ID) == enterCardExpDateMessage:
-		return b.handleCardExpDate(c)
+		return b.cardAttachmentHandler.GetNext().GetNext().Handle(c)
 
 	// Check if the last sent message was for entering cardholder information
 	case b.lastSentMessage.get(c.Sender().ID) == enterCardHolderMessage:
-		return b.handleCardHolder(c)
+		return b.cardAttachmentHandler.GetNext().GetNext().GetNext().Handle(c)
 
 	// Check if the last sent message was for entering card CVV
 	case b.lastSentMessage.get(c.Sender().ID) == enterCardCVVMessage:
-		return b.handleCVV(c)
+		return b.cardAttachmentHandler.GetNext().GetNext().GetNext().GetNext().Handle(c)
 
 	// Check if the last sent message was for inserting fuel amount
 	case b.lastSentMessage.get(c.Sender().ID) == insertFuelAmountMessage:
@@ -256,109 +254,6 @@ func (b *Bot) handleFuelAmount(c tele.Context) (*tele.Message, error) {
 	orders[c.Sender().ID] = ord
 
 	return b.bot.Send(c.Sender(), choosePaymentMethodMessage, b.getPaymentMarkup())
-}
-
-// handleCVV handles the user's entry of the CVV (Card Verification Value).
-func (b *Bot) handleCVV(c tele.Context) (*tele.Message, error) {
-	// Verify the CVV entered by the user.
-	cvv, err := b.verifyCVV(c.Text())
-	if err != nil {
-		if _, err := b.bot.Send(c.Sender(), err.Error()); err != nil {
-			log.Printf("failed to send a message to the user: %v", err)
-		}
-
-		return b.bot.Send(c.Sender(), enterCardCVVMessage)
-	}
-
-	// Update the CVV in the user's credit card information.
-	card := cards[c.Sender().ID]
-	card.CVV = cvv
-	cards[c.Sender().ID] = card
-
-	// Store the card information in the repository.
-	if err = b.repo.Create(card); err != nil {
-		if _, err = b.bot.Send(c.Sender(), somethingWentWrongMessage); err != nil {
-			log.Printf("failed to send a message to the user: %v", err)
-		}
-
-		return b.handleStart(c)
-	}
-
-	// Delete the stored card information and send a success message.
-	delete(cards, c.Sender().ID)
-
-	if _, err := b.bot.Send(c.Sender(), cardAttachmentSuccessMessage); err != nil {
-		log.Printf("failed to send a message to the user: %v", err)
-	}
-
-	return b.handleStart(c)
-}
-
-// handleCardHolder handles the user's entry of the cardholder's name.
-func (b *Bot) handleCardHolder(c tele.Context) (*tele.Message, error) {
-	// Verify the cardholder's name entered by the user.
-	holder, err := b.verifyCardHolder(c.Text())
-	if err != nil {
-		if _, err := b.bot.Send(c.Recipient(), err.Error()); err != nil {
-			log.Printf("failed to send a message to the user: %v", err)
-		}
-
-		return b.bot.Send(c.Sender(), enterCardHolderMessage)
-	}
-
-	// Update the cardholder's name in the user's credit card information.
-	card := cards[c.Sender().ID]
-	card.Cardholder = holder
-	cards[c.Sender().ID] = card
-
-	// Prompt the user to enter the CVV.
-	return b.bot.Send(c.Sender(), enterCardCVVMessage)
-}
-
-// handleCardExpDate handles the user's entry of the card expiration date.
-func (b *Bot) handleCardExpDate(c tele.Context) (*tele.Message, error) {
-	// Verify the card expiration date entered by the user.
-	exp, err := b.verifyExpDate(c.Text())
-	if err != nil {
-		if _, err := b.bot.Send(c.Recipient(), err.Error()); err != nil {
-			log.Printf("failed to send a message to the user: %v", err)
-		}
-
-		return b.bot.Send(c.Sender(), enterCardExpDateMessage)
-	}
-
-	// Update the expiration date in the user's credit card information.
-	card := cards[c.Sender().ID]
-	card.ExpirationDate = exp
-	cards[c.Sender().ID] = card
-
-	// Prompt the user to enter the cardholder's name.
-	return b.bot.Send(c.Sender(), enterCardHolderMessage)
-}
-
-// handleCardNumber handles the user's entry of the card number.
-func (b *Bot) handleCardNumber(c tele.Context) (*tele.Message, error) {
-	// Verify the card number entered by the user.
-	num, err := b.verifyCardNumber(c.Text())
-	if err != nil {
-		if _, err := b.bot.Send(c.Recipient(), err.Error()); err != nil {
-			log.Printf("failed to send a message to the user: %v", err)
-		}
-
-		return b.bot.Send(c.Sender(), enterCardNumberMessage)
-	}
-
-	// Store the user's credit card information with the card number.
-	cards[c.Sender().ID] = model.CreditCard{Number: num, TelegramID: c.Sender().ID}
-
-	// Prompt the user to enter the card expiration date.
-	return b.bot.Send(c.Sender(), enterCardExpDateMessage)
-}
-
-// handleCardLink handles the card linking process.
-func (b *Bot) handleCardLink(c tele.Context) (*tele.Message, error) {
-	// Prompt the user to enter the card number.
-	return b.bot.Send(c.Sender(), enterCardNumberMessage, b.getCancelMarkup())
 }
 
 // handleOrder handles the order process.
