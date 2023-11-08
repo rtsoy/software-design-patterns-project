@@ -60,7 +60,7 @@ func (b *Bot) handleCancel(c tele.Context) (*tele.Message, error) {
 
 	// Notify subscribed users and unsubscribe them from fuel pump updates.
 	for _, id := range ids {
-		obs := observer.NewFuelPump(b.repo.ObserverRepository, b.bot, id)
+		var obs observer.Subject = observer.NewFuelPump(b.repo.ObserverRepository, b.bot, id)
 
 		users, err := obs.NotifyAll()
 		if err != nil {
@@ -371,27 +371,17 @@ func (b *Bot) handleOrder(c tele.Context) (*tele.Message, error) {
 		return nil, err
 	}
 
+	// Create an OrderHandler to manage the order states.
+	handler := &OrderHandler{}
+
 	// Attempt to take or release a fuel pump for the user.
 	err = b.repo.FuelPumpRepository.TakeOrRelease(c.Sender().ID, id)
-	if err != nil { //nolint
+	if err != nil {
 		if errors.Is(err, repository.ErrForbidden) {
-			// If the fuel pump is not available, notify the user and subscribe to updates.
-			err = c.Send(fuelPumpIsNotAvailableMessage)
-			if err != nil {
-				log.Printf("msg: %s | %v", c.Text(), err) // ???
+			// Set the current state to NotAvailableOrder when fuel pump is unavailable.
+			handler.SetCurrentState(&NotAvailableOrder{pumpID: id})
 
-				return nil, err
-			}
-
-			obs := observer.NewFuelPump(b.repo.ObserverRepository, b.bot, id)
-			err = obs.Subscribe(c.Sender().ID)
-
-			if err != nil {
-				log.Printf("failed to subcribe a user to fuel pump: %v", err)
-			}
-
-			// Redirect the user to the start command handler.
-			return b.handleStart(c)
+			return handler.HandleOrder(b, c)
 		}
 
 		log.Printf("msg: %s | %v", c.Text(), err) // ???
@@ -399,13 +389,10 @@ func (b *Bot) handleOrder(c tele.Context) (*tele.Message, error) {
 		return nil, err
 	}
 
-	re := regexp.MustCompile(`(\d+)₸`)
-	matches := re.FindAllStringSubmatch(c.Text(), -1)
-	pumpPrice, _ := strconv.ParseUint(matches[0][1], 10, 64)
+	// Set the current state to AvailableOrder when the pump is available.
+	handler.SetCurrentState(&AvailableOrder{})
 
-	orders[c.Sender().ID] = order{price: pumpPrice}
-
-	return b.bot.Send(c.Sender(), insertFuelAmountMessage, b.getCancelMarkup())
+	return handler.HandleOrder(b, c)
 }
 
 // handleFuelPumps handles the fuel pump selection process.
