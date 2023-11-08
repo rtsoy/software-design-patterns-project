@@ -22,47 +22,42 @@ type Bot struct {
 // New creates a new Bot instance with the provided repository and starts it.
 // It initializes the Telegram bot with the provided token and long poller settings.
 func New(repo *repository.Repository) (*Bot, error) {
+	// Initialize the Telegram bot settings.
 	pref := tele.Settings{
 		Token:  config.Get().TelegramToken,
 		Poller: &tele.LongPoller{Timeout: _defaultLongPollerTimeout},
 	}
 
+	// Create a new Bot instance with the Telegram bot and the repository.
 	b, err := tele.NewBot(pref)
 	if err != nil {
 		return nil, err
 	}
 
+	// Create a new Bot instance with the Telegram bot and the repository.
 	bot := &Bot{
 		bot:             b,
 		repo:            repo,
 		lastSentMessage: newLastSentMessage(),
 	}
 
-	cardCVVHandler := &CardCVVHandler{
-		next: nil,
-		b:    bot,
+	// Create a chain of responsibility for card attachment verification.
+	bot.cardAttachmentHandler = &ConcreteCardHandler{
+		next: &CardNumberHandler{
+			next: &CardExpDateHandler{
+				next: &CardHolderHandler{
+					next: &CardCVVHandler{
+						next: nil, // The last handler in the chain.
+						b:    bot,
+					},
+					b: bot,
+				},
+				b: bot,
+			},
+			b: bot,
+		},
+		b: bot,
 	}
-
-	cardHolderHandler := &CardHolderHandler{
-		next: cardCVVHandler,
-		b:    bot,
-	}
-
-	cardExpDateHandler := &CardExpDateHandler{
-		next: cardHolderHandler,
-		b:    bot,
-	}
-
-	cardNumberHandler := &CardNumberHandler{
-		next: cardExpDateHandler,
-		b:    bot,
-	}
-
-	initCardHandler := &ConcreteNumberHandler{
-		next: cardNumberHandler,
-		b:    bot,
-	}
-	bot.cardAttachmentHandler = initCardHandler
 
 	// Initialize message handlers.
 	bot.initHandlers()

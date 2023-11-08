@@ -18,21 +18,21 @@ type CardHandler interface {
 	GetNext() CardHandler
 }
 
-// ConcreteNumberHandler handles the step of entering the card number.
-type ConcreteNumberHandler struct {
+// ConcreteCardHandler handles the step of entering the card number.
+type ConcreteCardHandler struct {
 	next CardHandler
 	b    *Bot
 }
 
-func (h *ConcreteNumberHandler) Handle(c tele.Context) (*tele.Message, error) {
+func (h *ConcreteCardHandler) Handle(c tele.Context) (*tele.Message, error) {
 	return h.b.bot.Send(c.Sender(), enterCardNumberMessage, h.b.getCancelMarkup())
 }
 
-func (h *ConcreteNumberHandler) SetNext(handler CardHandler) {
+func (h *ConcreteCardHandler) SetNext(handler CardHandler) {
 	h.next = handler
 }
 
-func (h *ConcreteNumberHandler) GetNext() CardHandler {
+func (h *ConcreteCardHandler) GetNext() CardHandler {
 	return h.next
 }
 
