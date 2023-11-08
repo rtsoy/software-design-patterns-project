@@ -20,6 +20,7 @@ const (
 )
 
 type order struct {
+	pumpID uint64
 	price  uint64
 	amount uint64
 }
@@ -130,11 +131,11 @@ func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) { //nolint
 
 	// ex. "▶️ Начать!"
 	case strings.Contains(c.Text(), "▶️"):
-		return b.handleRefueling(c)
+		return b.handleStartRefueling(c)
 
 	// ex. "🛑 Закончить заправку!"
 	case strings.Contains(c.Text(), "🛑"):
-		return b.handleCancel(c)
+		return b.handleStopRefueling(c)
 
 	// Unexpected response (command/message)
 	default:
@@ -142,8 +143,30 @@ func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) { //nolint
 	}
 }
 
+func (b *Bot) handleStopRefueling(c tele.Context) (*tele.Message, error) {
+	// Get the pumpID associated with the user's order.
+	pumpID := orders[c.Sender().ID].pumpID
+
+	// Create a StopCommand instance with the pump information.
+	stopCommand := &StopCommand{pump: &FuelPump{pumpID: pumpID}}
+
+	// Execute the stopCommand.
+	stopCommand.execute()
+
+	return b.handleCancel(c)
+}
+
 // handleRefueling handles the user's request to stop refueling.
-func (b *Bot) handleRefueling(c tele.Context) (*tele.Message, error) {
+func (b *Bot) handleStartRefueling(c tele.Context) (*tele.Message, error) {
+	// Get the pumpID associated with the user's order.
+	pumpID := orders[c.Sender().ID].pumpID
+
+	// Create a StartCommand instance with the pump information.
+	startCommand := &StartCommand{pump: &FuelPump{pumpID: pumpID}}
+
+	// Execute the startCommand to initiate refueling.
+	startCommand.execute()
+
 	return b.bot.Send(c.Sender(), stopRefueling, b.getStopMarkup())
 }
 
@@ -178,7 +201,7 @@ func (b *Bot) handleBankPayment(c tele.Context) (*tele.Message, error) {
 	payStrategy.ProcessPayment(total)
 
 	// Send a confirmation message to the user with the deducted amount.
-	if _, err := b.bot.Send(c.Sender(), fmt.Sprintf("-%d₸", total)); err != nil {
+	if _, err = b.bot.Send(c.Sender(), fmt.Sprintf("-%d₸", total)); err != nil {
 		log.Printf("failed to send a message to the user: %v", err)
 	}
 
@@ -283,6 +306,9 @@ func (b *Bot) handleOrder(c tele.Context) (*tele.Message, error) {
 
 		return nil, err
 	}
+
+	// Update the user's order with the selected fuelID.
+	orders[c.Sender().ID] = order{pumpID: id}
 
 	// Set the current state to AvailableOrder when the pump is available.
 	handler.SetCurrentState(&AvailableOrder{})

@@ -39,7 +39,10 @@ func (h *AvailableOrder) HandleOrder(b *Bot, c tele.Context) (*tele.Message, err
 	matches := re.FindAllStringSubmatch(c.Text(), -1)
 	pumpPrice, _ := strconv.ParseUint(matches[0][1], 10, 64)
 
-	orders[c.Sender().ID] = order{price: pumpPrice}
+	// Update the user's order with the selected fuel price.
+	ord := orders[c.Sender().ID]
+	ord.price = pumpPrice
+	orders[c.Sender().ID] = ord
 
 	return b.bot.Send(c.Sender(), insertFuelAmountMessage, b.getCancelMarkup())
 }
