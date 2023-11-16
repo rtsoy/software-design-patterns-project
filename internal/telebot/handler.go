@@ -26,7 +26,8 @@ type order struct {
 }
 
 var (
-	orders = map[int64]order{}
+	orders    = map[int64]order{}
+	refueling = map[int64]struct{}{}
 )
 
 // initHandlers initializes the command handlers for the bot.
@@ -80,7 +81,14 @@ func (b *Bot) handleCancel(c tele.Context) (*tele.Message, error) {
 
 // handleMessage handles user messages.
 func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) { //nolint
+	// Check if the user is currently in the process of refueling.
+	_, isRefueling := refueling[c.Sender().ID]
+
 	switch {
+	// Check if the sender's ID is present in the refueling users.
+	case isRefueling:
+		return b.bot.Send(c.Sender(), pleaseWaitMessage)
+
 	// ex. "1 | ⛽️ Gas Energy (просп. Кабанбай Батыра 45B)"
 	case strings.Contains(c.Text(), "⛽️"):
 		return b.handleFuelPumps(c)
@@ -126,14 +134,14 @@ func (b *Bot) handleMessage(c tele.Context) (*tele.Message, error) { //nolint
 		return b.handleCreditCardPayment(c)
 
 	// Check if the last sent message was for choosing credit card
-	case b.lastSentMessage.get(c.Sender().ID) == chooseCreditCard:
+	case b.lastSentMessage.get(c.Sender().ID) == chooseCreditCardMessage:
 		return b.handleBankPayment(c)
 
 	// ex. "▶️ Начать!"
 	case strings.Contains(c.Text(), "▶️"):
 		return b.handleStartRefueling(c)
 
-	// ex. "🛑 Закончить заправку!"
+	// ex. "🛑 Освободить колонку!"
 	case strings.Contains(c.Text(), "🛑"):
 		return b.handleStopRefueling(c)
 
@@ -157,9 +165,10 @@ func (b *Bot) handleStopRefueling(c tele.Context) (*tele.Message, error) {
 }
 
 // handleRefueling handles the user's request to stop refueling.
-func (b *Bot) handleStartRefueling(c tele.Context) (*tele.Message, error) {
-	// Get the pumpID associated with the user's order.
-	pumpID := orders[c.Sender().ID].pumpID
+func (b *Bot) handleStartRefueling(c tele.Context) (*tele.Message, error) { //nolint
+	// Get the user's order and pumpID associated with the user's order.
+	userOrder := orders[c.Sender().ID]
+	pumpID := userOrder.pumpID
 
 	// Create a StartCommand instance with the pump information.
 	startCommand := &StartCommand{pump: &FuelPump{pumpID: pumpID}}
@@ -167,7 +176,64 @@ func (b *Bot) handleStartRefueling(c tele.Context) (*tele.Message, error) {
 	// Execute the startCommand to initiate refueling.
 	startCommand.execute()
 
-	return b.bot.Send(c.Sender(), stopRefueling, b.getStopMarkup())
+	// Extract the user's order amount for refueling.
+	userAmount := float64(userOrder.amount)
+
+	// Create a reply markup for inline buttons.
+	markup := &tele.ReplyMarkup{}
+
+	// Create an empty reply markup to avoid start refueling abuse
+	noBtn := &tele.ReplyMarkup{}
+	noBtn.Row(noBtn.Text(" "))
+
+	// Set the initial text for the progress, starting at 0.00.
+	text := fmt.Sprintf("0.00/%.2f", userAmount)
+
+	// Create a text button with the initial progress.
+	startPoint := markup.Text(text)
+
+	// Add the text button to the first row of the inline markup.
+	markup.Inline(
+		markup.Row(startPoint),
+	)
+
+	// Send a message indicating the start of refueling and initial progress.
+	msg, err := b.bot.Send(c.Sender(), refuelingProgressMessage, markup, noBtn)
+	if err != nil {
+		log.Printf("err: %v", err)
+	}
+
+	// Mark the user as currently refueling to avoid multiple requests.
+	refueling[c.Sender().ID] = struct{}{}
+
+	var i float64
+	// Loop to update refueling progress in increments of userAmount/10.
+	for i = 0; i <= userAmount; i += userAmount / 10 { //nolint
+		text = fmt.Sprintf("%.2f/%.2f", i, userAmount)
+
+		// Update the text of the inline button with the current progress.
+		point := markup.Text(text)
+		markup.Inline(
+			markup.Row(point),
+		)
+
+		// Edit the existing message to show the updated progress.
+		_, err = b.bot.Edit(msg, msg.Text, markup)
+		if err != nil && i != 0 {
+			log.Printf("failed to edit a message: %v", err)
+		}
+	}
+
+	// Send a message indicating the completion of refueling with a stop button.
+	msg, err = b.bot.Send(c.Sender(), stopRefuelingMessage, b.getStopMarkup())
+	if err != nil {
+		return nil, err
+	}
+
+	// Remove the user from the refueling map, allowing them to start again.
+	delete(refueling, c.Sender().ID)
+
+	return msg, nil
 }
 
 // handleBankPayment handles the user's request to make a payment using a bank card.
@@ -205,7 +271,7 @@ func (b *Bot) handleBankPayment(c tele.Context) (*tele.Message, error) {
 		log.Printf("failed to send a message to the user: %v", err)
 	}
 
-	return b.bot.Send(c.Sender(), startRefueling, b.getStartMarkup())
+	return b.bot.Send(c.Sender(), startRefuelingMessage, b.getStartMarkup())
 }
 
 // handleCreditCardPayment handles the user's request to pay using a credit card.
@@ -222,7 +288,7 @@ func (b *Bot) handleCreditCardPayment(c tele.Context) (*tele.Message, error) {
 
 	// Check if the user has no attached credit cards and guide them to add one.
 	if len(userCards) == 0 {
-		if _, err := b.bot.Send(c.Sender(), noAttachedCreditCards); err != nil {
+		if _, err := b.bot.Send(c.Sender(), noAttachedCreditCardsMessage); err != nil {
 			log.Printf("failed to send a message to the user: %v", err)
 		}
 
@@ -231,7 +297,7 @@ func (b *Bot) handleCreditCardPayment(c tele.Context) (*tele.Message, error) {
 	}
 
 	// Provide a list of the user's credit cards for selection.
-	return b.bot.Send(c.Sender(), chooseCreditCard, b.getCreditCardsMarkup(userCards))
+	return b.bot.Send(c.Sender(), chooseCreditCardMessage, b.getCreditCardsMarkup(userCards))
 }
 
 // handlePaymentToTheCashier handles the user's request to make a payment to the cashier using cash.
@@ -247,7 +313,7 @@ func (b *Bot) handlePaymentToTheCashier(c tele.Context) (*tele.Message, error) {
 	payStrategy.ProcessPayment(total)
 
 	// Send a confirmation message to the user and return to the refueling process.
-	return b.bot.Send(c.Sender(), startRefueling, b.getStartMarkup())
+	return b.bot.Send(c.Sender(), startRefuelingMessage, b.getStartMarkup())
 }
 
 // handleCashPayment handles the user's request to pay with cash.
