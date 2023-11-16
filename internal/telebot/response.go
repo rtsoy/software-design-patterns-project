@@ -95,6 +95,17 @@ func (b *Bot) getDoneOrCancelMarkup() *tele.ReplyMarkup {
 	return markup
 }
 
+func (b *Bot) getDefaultFuelAmountMarkup() *tele.ReplyMarkup {
+	markup := &tele.ReplyMarkup{}
+
+	defaultAmounts := markup.Row(markup.Text("10"), markup.Text("20"), markup.Text("30"), markup.Text("50"))
+	row := markup.Row(markup.Text("⛔️ Отмена!"))
+
+	markup.Reply(defaultAmounts, row)
+
+	return markup
+}
+
 func (b *Bot) getCancelMarkup() *tele.ReplyMarkup {
 	markup := &tele.ReplyMarkup{}
 

@@ -44,7 +44,7 @@ func (h *AvailableOrder) HandleOrder(b *Bot, c tele.Context) (*tele.Message, err
 	ord.price = pumpPrice
 	orders[c.Sender().ID] = ord
 
-	return b.bot.Send(c.Sender(), insertFuelAmountMessage, b.getCancelMarkup())
+	return b.bot.Send(c.Sender(), insertFuelAmountMessage, b.getDefaultFuelAmountMarkup())
 }
 
 // NotAvailableOrder represents the state when an order is not available.
